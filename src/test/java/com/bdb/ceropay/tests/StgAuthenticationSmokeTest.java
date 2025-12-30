@@ -1,4 +1,4 @@
-package com.bdb.ceropay;
+package com.bdb.ceropay.test;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -38,16 +38,13 @@ public class StgAuthenticationSmokeTest {
         WebElement cedulaInput = idBox.getShadowRoot().findElement(By.cssSelector("input"));
         cedulaInput.sendKeys("123456789");
 
-// check (Terms) - robusto con JS + espera real
-        // CHECK "Acepto Términos y condiciones"
+
         JavascriptExecutor js = (JavascriptExecutor) driver;
 
-// 1. Buscar el web component del checkbox
         WebElement checkHost = (WebElement) js.executeScript(
                 "return document.querySelector('sp-at-check-button');"
         );
 
-// 2. Buscar el checkbox real dentro del shadow DOM
         WebElement checkbox = (WebElement) js.executeScript(
                 "return arguments[0].shadowRoot.querySelector(\"div[role='checkbox']\");",
                 checkHost
