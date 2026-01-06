@@ -1,4 +1,4 @@
-package com.bdb.ceropay.test;
+package com.bdb.ceropay.tests;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
