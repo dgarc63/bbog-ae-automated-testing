@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import com.bdb.ceropay.data.TestData;
+import com.bdb.ceropay.data.TestDataFactory;
 
 import java.time.Duration;
 
@@ -15,27 +17,26 @@ public class StgAuthenticationSmokeTest {
     private WebDriver driver;
 
     @Test
-    void shouldNavigateFromAuthenticationToCheckout() {
+    void shouldNavigateFromAuthenticationToBasicData() {
         driver = new ChromeDriver();
         driver.get("https://bnpl.labdigbdbstgae.com/origination");
 
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+
+        TestData data = TestDataFactory.create().load();
 
         new AuthenticationPage(driver, wait)
-                .typeLastName("PRUEBA")
-                .typeIdentification("123456789")
+                .typeLastName(data.getLastName())
+                .typeIdentification(data.getIdentification())
                 .acceptTerms()
-                .clickContinue()          // -> StartRequestPage
+                .clickContinue()
                 .assertPageLoaded()
-                .clickStartRequest()      // -> CheckoutPage
+                .clickStartRequest()
                 .assertPageLoaded()
                 .acceptTerms()
-                .clickContinue()          // -> BasicDataPage (pantalla grande)
+                .clickContinue()
                 .assertPageLoaded();
-
-
-        // Si quieres, puedes dejar esto explícito (opcional):
-        // checkoutPage.assertPageLoaded();
+        // aquí sigues con el check y continuar de CheckoutPage
     }
 
     @AfterEach
