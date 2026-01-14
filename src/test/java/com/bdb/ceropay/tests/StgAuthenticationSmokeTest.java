@@ -25,18 +25,18 @@ public class StgAuthenticationSmokeTest {
 
         TestData data = TestDataFactory.create().load();
 
-        new AuthenticationPage(driver, wait)
-                .typeLastName(data.getLastName())
-                .typeIdentification(data.getIdentification())
-                .acceptTerms()
-                .clickContinue()
-                .assertPageLoaded()
-                .clickStartRequest()
-                .assertPageLoaded()
-                .acceptTerms()
-                .clickContinue()
-                .assertPageLoaded();
-        // aquí sigues con el check y continuar de CheckoutPage
+    new AuthenticationPage(driver, wait)
+        .typeLastName(data.getLastName())
+        .typeIdentification(data.getIdentification())
+        .acceptTerms()
+        .clickContinue()
+        .assertPageLoaded()
+        .clickStartRequest()
+        .assertPageLoaded()
+        .acceptTerms()     // CheckoutPage
+        .clickContinue()   // -> BasicDataPage
+        .assertPageLoaded();
+
     }
 
     @AfterEach

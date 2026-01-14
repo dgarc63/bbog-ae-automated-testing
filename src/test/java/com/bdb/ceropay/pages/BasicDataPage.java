@@ -10,8 +10,8 @@ public class BasicDataPage {
     private final WebDriver driver;
     private final WebDriverWait wait;
 
-
-    private final By body = By.tagName("body");
+    
+    private final By uniqueMarker = By.cssSelector("body"); // placeholder temporal
 
     public BasicDataPage(WebDriver driver, WebDriverWait wait) {
         this.driver = driver;
@@ -19,7 +19,13 @@ public class BasicDataPage {
     }
 
     public BasicDataPage assertPageLoaded() {
-        wait.until(ExpectedConditions.visibilityOfElementLocated(body));
+        // 1) Asegura que saliste de /checkout base si aplica
+        // (ajusta a lo que veas realmente)
+        wait.until(d -> d.getCurrentUrl().contains("/checkout"));
+
+        // 2) Espera algo único de la pantalla
+        wait.until(ExpectedConditions.visibilityOfElementLocated(uniqueMarker));
+
         return this;
     }
 }

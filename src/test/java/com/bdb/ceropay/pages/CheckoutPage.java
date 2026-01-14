@@ -9,13 +9,14 @@ public class CheckoutPage {
     private final WebDriver driver;
     private final WebDriverWait wait;
 
-    // Selector estable del checkbox (sin depender de --uncheck/--check)
-    private static final String TERMS_SQUARE_STABLE = "div.sp-at-checkbox__content__square";
+    // Host del componente checkbox (Shadow DOM)
+    private final By termsHost =
+            By.cssSelector("sp-at-check-button#user-data-to-change-checkBtn");
 
-    // Botón continuar por texto (más estable que clases)
-    private final By continuarBtn = By.xpath("//button[contains(.,'Continuar')]");
+    // Botón continuar (real)
+    private final By continuarBtn = By.id("user-data-continue");
 
-    // Loader/overlay que intercepta clicks
+    // Loader
     private final By loaderOpen = By.cssSelector("sp-ml-loader[is-open='true']");
 
     public CheckoutPage(WebDriver driver, WebDriverWait wait) {
@@ -25,93 +26,92 @@ public class CheckoutPage {
 
     public CheckoutPage assertPageLoaded() {
         wait.until(d -> d.getCurrentUrl().contains("/checkout"));
-        // Señal mínima de que el contenido cargó: ya existe el checkbox (aunque esté dentro de shadow)
-        // Usamos deepQuery para confirmarlo
-        WebElement square = findElementSmart(TERMS_SQUARE_STABLE);
-        if (square == null) throw new NoSuchElementException("No cargó el checkbox de términos en Checkout.");
+        wait.until(ExpectedConditions.presenceOfElementLocated(termsHost));
+        wait.until(ExpectedConditions.presenceOfElementLocated(continuarBtn));
         return this;
     }
 
     public CheckoutPage acceptTerms() {
-        waitForNoLoader();
-        WebElement checkboxSquare = findElementSmart(TERMS_SQUARE_STABLE);
-        clickSmart(checkboxSquare);
-        return this;
+    waitForNoLoader();
+
+    WebElement host = wait.until(ExpectedConditions.presenceOfElementLocated(termsHost));
+    JavascriptExecutor js = (JavascriptExecutor) driver;
+
+    // Espera a que el shadowRoot esté listo y exista el checkbox interno
+    wait.until(d -> (Boolean) js.executeScript(
+            "return arguments[0].shadowRoot && arguments[0].shadowRoot.querySelector(\"div[role='checkbox']\") != null;",
+            host
+    ));
+
+    // ✅ Selector correcto: contiene 'sp-at-checkbox__content__square'
+    WebElement square = (WebElement) js.executeScript(
+            "return arguments[0].shadowRoot.querySelector(\"div[class*='sp-at-checkbox__content__square']\");",
+            host
+    );
+
+    if (square == null) {
+        throw new NoSuchElementException("No se encontró el square del checkbox (class*='sp-at-checkbox__content__square') en el shadowRoot");
     }
+
+    scrollCenter(square);
+
+    // Click confiable
+    js.executeScript("arguments[0].click();", square);
+
+    // Validar que quedó marcado
+    WebElement roleCheckbox = (WebElement) js.executeScript(
+            "return arguments[0].shadowRoot.querySelector(\"div[role='checkbox']\");",
+            host
+    );
+
+    wait.until(d -> "true".equalsIgnoreCase(roleCheckbox.getAttribute("aria-checked")));
+
+    // Espera habilitación del botón
+    wait.until(d -> {
+        WebElement btn = d.findElement(continuarBtn);
+        return btn.getAttribute("disabled") == null && btn.isEnabled();
+    });
+
+    return this;
+}
+
 
     public BasicDataPage clickContinue() {
         waitForNoLoader();
+
         WebElement btn = wait.until(ExpectedConditions.elementToBeClickable(continuarBtn));
-        clickSmart(btn);
+        scrollCenter(btn);
+        btn.click();
+
         return new BasicDataPage(driver, wait);
     }
 
-    /**
-     * Busca un elemento por CSS:
-     * - Primero en DOM normal
-     * - Si no aparece, busca dentro de shadowRoots (deep query)
-     */
-    private WebElement findElementSmart(String cssSelector) {
-        try {
-            return wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(cssSelector)));
-        } catch (TimeoutException ignored) {
-            JavascriptExecutor js = (JavascriptExecutor) driver;
-            WebElement el = (WebElement) js.executeScript(shadowDeepQueryScript(), cssSelector);
-            if (el == null) {
-                throw new NoSuchElementException("No se encontró (DOM ni Shadow DOM): " + cssSelector);
-            }
-            return el;
-        }
-    }
-
-    private void clickSmart(WebElement element) {
-        waitForNoLoader();
-
-        ((JavascriptExecutor) driver).executeScript(
-                "arguments[0].scrollIntoView({block:'center'});", element
-        );
-
-        try {
-            element.click();
-        } catch (ElementClickInterceptedException e) {
-            waitForNoLoader();
-            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", element);
-        } catch (StaleElementReferenceException e) {
-            // Si se re-renderizó el DOM, reintenta por JS click directo (último recurso)
-            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", element);
-        }
-    }
-
     private void waitForNoLoader() {
-        // Si no existe loader, pasa de una.
-        wait.until(d -> d.findElements(loaderOpen).isEmpty());
+    // Espera a que NO haya loader visible (aunque exista en el DOM)
+    wait.until(d -> {
+        try {
+            var openLoaders = d.findElements(loaderOpen); // sp-ml-loader[is-open='true']
+            if (openLoaders.isEmpty()) return true;
+
+            for (WebElement l : openLoaders) {
+                try {
+                    if (l.isDisplayed()) {
+                        return false; // sigue visible, sigue bloqueando
+                    }
+                } catch (StaleElementReferenceException ignored) {
+                    // si se refresca el DOM, lo tomamos como "no bloquea"
+                }
+            }
+            return true; // están pero no visibles
+        } catch (Exception e) {
+            return true; // defensivo: no bloquees el flujo por glitches del DOM
+        }
+    });
     }
 
-    /**
-     * Script para buscar un selector dentro del DOM y dentro de shadowRoots recursivamente.
-     */
-    private String shadowDeepQueryScript() {
-        return """
-            const selector = arguments[0];
-            function deepQuery(root) {
-              if (!root) return null;
-
-              const found = root.querySelector ? root.querySelector(selector) : null;
-              if (found) return found;
-
-              const base = (root instanceof Document) ? root.documentElement : root;
-              const treeWalker = document.createTreeWalker(base, NodeFilter.SHOW_ELEMENT);
-
-              while (treeWalker.nextNode()) {
-                const node = treeWalker.currentNode;
-                if (node && node.shadowRoot) {
-                  const inside = deepQuery(node.shadowRoot);
-                  if (inside) return inside;
-                }
-              }
-              return null;
-            }
-            return deepQuery(document);
-        """;
+    private void scrollCenter(WebElement el) {
+        ((JavascriptExecutor) driver).executeScript(
+                "arguments[0].scrollIntoView({block:'center'});", el
+        );
     }
 }
