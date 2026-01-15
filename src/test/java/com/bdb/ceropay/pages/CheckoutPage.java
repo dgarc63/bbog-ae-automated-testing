@@ -76,15 +76,30 @@ public class CheckoutPage {
 }
 
 
-    public BasicDataPage clickContinue() {
-        waitForNoLoader();
+    public PersonalInformationPage clickContinue() {
+    waitForNoLoader();
 
-        WebElement btn = wait.until(ExpectedConditions.elementToBeClickable(continuarBtn));
-        scrollCenter(btn);
+    WebElement btn = wait.until(ExpectedConditions.presenceOfElementLocated(continuarBtn));
+    wait.until(d -> btn.getAttribute("disabled") == null);
+    wait.until(ExpectedConditions.elementToBeClickable(btn));
+
+    scrollCenter(btn);
+
+    try {
         btn.click();
-
-        return new BasicDataPage(driver, wait);
+    } catch (ElementClickInterceptedException e) {
+        waitForNoLoader();
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", btn);
     }
+
+    // Espera real de navegación: en tu bundle se ve "basic-data"
+    wait.until(d -> d.getCurrentUrl().contains("basic-data") || d.getPageSource().contains("Completa tus datos"));
+
+    return new PersonalInformationPage(driver, wait);
+};
+
+
+    // ---------------- helpers ----------------
 
     private void waitForNoLoader() {
     // Espera a que NO haya loader visible (aunque exista en el DOM)

@@ -4,12 +4,15 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.InputStream;
+import java.util.Locale;
 
 public class ExcelTestDataLoader implements TestDataLoader {
 
     private final String resourcePath; // ej: "testdata/authData.xlsx"
     private final String sheetName;    // ej: "auth"
     private final int rowIndex;        // ej: 1 (fila 2, si 0 es header)
+
+    private final DataFormatter formatter = new DataFormatter(Locale.US);
 
     public ExcelTestDataLoader(String resourcePath, String sheetName, int rowIndex) {
         this.resourcePath = resourcePath;
@@ -22,7 +25,6 @@ public class ExcelTestDataLoader implements TestDataLoader {
         TestData defaults = TestData.defaults();
 
         try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
-            // Si no existe el archivo -> defaults
             if (is == null) return defaults;
 
             try (Workbook wb = new XSSFWorkbook(is)) {
@@ -33,49 +35,81 @@ public class ExcelTestDataLoader implements TestDataLoader {
                 Row row = sheet.getRow(rowIndex);
                 if (header == null || row == null) return defaults;
 
-                int colLastName = findCol(header, "lastName", "apellido");
-                int colId = findCol(header, "identification", "cedula");
+                // --- columnas (con alias) ---
+                Integer colLastName = findColOrNull(header, "lastname", "apellido");
+                Integer colId = findColOrNull(header, "identification", "identificacion", "cedula", "cédula");
 
-                String lastName = cellAsString(row.getCell(colLastName)).trim();
-                String identification = cellAsString(row.getCell(colId)).trim();
+                Integer colFirstName = findColOrNull(header, "firstname", "primernombre", "nombre");
+                Integer colBirthDay = findColOrNull(header, "birthday", "dianacimiento", "dia");
+                Integer colBirthMonth = findColOrNull(header, "birthmonth", "mesnacimiento", "mes");
+                Integer colBirthYear = findColOrNull(header, "birthyear", "anionacimiento", "año", "anio");
 
-                if (lastName.isBlank() || identification.isBlank()) return defaults;
+                Integer colMonthlyIncome = findColOrNull(header, "monthlyincome", "ingresosmensuales", "ingresos");
 
-                return new TestData(lastName, identification);
+                // --- valores (si no hay col -> defaults) ---
+                String lastName = readCell(row, colLastName, defaults.getLastName());
+                String identification = readCell(row, colId, defaults.getIdentification());
+
+                String firstName = readCell(row, colFirstName, defaults.getFirstName());
+                String birthDay = readCell(row, colBirthDay, defaults.getBirthDay());
+                String birthMonth = readCell(row, colBirthMonth, defaults.getBirthMonth());
+                String birthYear = readCell(row, colBirthYear, defaults.getBirthYear());
+
+                String monthlyIncome = readCell(row, colMonthlyIncome, defaults.getMonthlyIncome());
+
+                // Validación mínima
+                if (isBlank(lastName) || isBlank(identification)) return defaults;
+
+                return new TestData(
+                        lastName,
+                        identification,
+                        firstName,
+                        birthDay,
+                        birthMonth,
+                        birthYear,
+                        monthlyIncome
+                );
             }
         } catch (Exception e) {
-            // Cualquier error leyendo Excel -> defaults (no rompe la ejecución)
+            // cualquier error -> defaults
             return defaults;
         }
     }
 
-    private int findCol(Row header, String... names) {
+    // ---------------- helpers ----------------
+
+    private Integer findColOrNull(Row header, String... names) {
         for (Cell c : header) {
-            String v = c.getStringCellValue();
+            String v = formatter.formatCellValue(c);
             if (v == null) continue;
-            String normalized = v.trim().toLowerCase();
+
+            String normalized = normalize(v);
             for (String name : names) {
-                if (normalized.equals(name.toLowerCase())) {
+                if (normalized.equals(normalize(name))) {
                     return c.getColumnIndex();
                 }
             }
         }
-        // Si no están las columnas, lanzamos y el catch devuelve defaults
-        throw new IllegalArgumentException("No se encontraron columnas esperadas en el header.");
+        return null;
     }
 
-    private String cellAsString(Cell cell) {
-        if (cell == null) return "";
-        return switch (cell.getCellType()) {
-            case STRING -> cell.getStringCellValue();
-            case NUMERIC -> {
-                // Para cédulas, usualmente es mejor evitar decimales
-                long asLong = (long) cell.getNumericCellValue();
-                yield String.valueOf(asLong);
-            }
-            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
-            case FORMULA -> cell.getCellFormula();
-            default -> "";
-        };
+    private String readCell(Row row, Integer colIndex, String fallback) {
+        if (colIndex == null) return fallback;
+
+        Cell cell = row.getCell(colIndex, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) return fallback;
+
+        String value = formatter.formatCellValue(cell);
+        value = value == null ? "" : value.trim();
+
+        return value.isBlank() ? fallback : value;
+    }
+
+    private String normalize(String s) {
+        return s == null ? "" : s.trim().toLowerCase(Locale.ROOT).replace(" ", "");
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 }

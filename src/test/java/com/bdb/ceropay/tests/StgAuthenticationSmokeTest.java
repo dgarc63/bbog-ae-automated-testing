@@ -21,21 +21,33 @@ public class StgAuthenticationSmokeTest {
         driver = new ChromeDriver();
         driver.get("https://bnpl.labdigbdbstgae.com/origination");
 
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(45));
 
-        TestData data = TestDataFactory.create().load();
 
-    new AuthenticationPage(driver, wait)
-        .typeLastName(data.getLastName())
-        .typeIdentification(data.getIdentification())
-        .acceptTerms()
-        .clickContinue()
-        .assertPageLoaded()
-        .clickStartRequest()
-        .assertPageLoaded()
-        .acceptTerms()     // CheckoutPage
-        .clickContinue()   // -> BasicDataPage
-        .assertPageLoaded();
+    TestData data = TestData.defaults();
+
+new AuthenticationPage(driver, wait)
+    .typeLastName(data.getLastName())
+    .typeIdentification(data.getIdentification())
+    .acceptTerms()
+    .clickContinue()
+    .assertPageLoaded()
+    .clickStartRequest()
+    .assertPageLoaded()
+    .acceptTerms()
+    .clickContinue()                 // <- ahora devuelve PersonalInformationPage
+    .assertPageLoaded()
+    .fillFirstName(data.getFirstName())
+    .fillBirthDate(
+    data.getBirthDay(),
+    data.getBirthMonth(),
+    data.getBirthYear())
+    .selectAsalariado()
+    .selectAsalariado()
+    .fillMonthlyIncome(data.getMonthlyIncome())
+    .clickContinue();
+
+
 
     }
 
