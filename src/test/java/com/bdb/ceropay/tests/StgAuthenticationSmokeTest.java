@@ -9,6 +9,7 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import com.bdb.ceropay.data.TestData;
 import com.bdb.ceropay.data.TestDataFactory;
+import com.bdb.ceropay.pages.AuthenticatorMockPage;
 
 import java.time.Duration;
 
@@ -27,28 +28,27 @@ public class StgAuthenticationSmokeTest {
     TestData data = TestData.defaults();
 
 new AuthenticationPage(driver, wait)
-    .typeLastName(data.getLastName())
-    .typeIdentification(data.getIdentification())
-    .acceptTerms()
-    .clickContinue()
-    .assertPageLoaded()
-    .clickStartRequest()
-    .assertPageLoaded()
-    .acceptTerms()
-    .clickContinue()                 // <- ahora devuelve PersonalInformationPage
-    .assertPageLoaded()
-    .fillFirstName(data.getFirstName())
-    .fillBirthDate(
-    data.getBirthDay(),
-    data.getBirthMonth(),
-    data.getBirthYear())
-    .selectAsalariado()
-    .selectAsalariado()
-    .fillMonthlyIncome(data.getMonthlyIncome())
-    .clickContinue();
-
-
-
+        .typeLastName(data.getLastName())
+        .typeIdentification(data.getIdentification())
+        .acceptTerms()
+        .clickContinue()
+        .assertPageLoaded()
+        .clickStartRequest()
+        .assertPageLoaded()
+        .acceptTerms()
+        .clickContinue() // CheckoutPage -> PersonalInformationPage
+        .assertPageLoaded()
+        .fillFirstName(data.getFirstName())
+        .fillBirthDate(data.getBirthDay(), data.getBirthMonth(), data.getBirthYear())
+        .selectAsalariado()
+        .fillMonthlyIncome(data.getMonthlyIncome())
+        .clickContinue() // PersonalInformationPage -> AuthenticatorMockPage
+        .assertPageLoaded()
+        .typeDocumentNumber(data.getIdentification())
+        .selectClienteActual()
+        .selectCanalWeb()
+        .selectTarjetaDebito()
+        .clickSiguiente();
     }
 
     @AfterEach
